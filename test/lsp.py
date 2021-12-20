@@ -434,7 +434,7 @@ class SolidityLSPTestSuite: # {{{
         report = published_diagnostics[1]
         self.expect_equal(report['uri'], self.get_test_file_uri('lib'), "Correct file URI")
         self.expect_equal(len(report['diagnostics']), 1, "one diagnostic")
-        self.expect_diagnostic(report['diagnostics'][0], code=2072, lineNo=12, startEndColumns=(8, 19))
+        self.expect_diagnostic(report['diagnostics'][0], code=2072, lineNo=31, startEndColumns=(8, 19))
 
     def test_didChange_in_A_causing_error_in_B(self, solc: JsonRpcProcess) -> None:
         # Reusing another test but now change some file that generates an error in the other.
@@ -451,8 +451,8 @@ class SolidityLSPTestSuite: # {{{
                 [
                     {
                         'range': {
-                            'start': { 'line':  5, 'character': 0 },
-                            'end':   { 'line': 10, 'character': 0 }
+                            'start': { 'line': 24, 'character': 0 },
+                            'end':   { 'line': 29, 'character': 0 }
                         },
                         'text': "" # deleting function `add`
                     }
@@ -497,7 +497,7 @@ class SolidityLSPTestSuite: # {{{
         report = published_diagnostics[1]
         self.expect_equal(report['uri'], self.get_test_file_uri('lib'), "Correct file URI")
         self.expect_equal(len(report['diagnostics']), 1, "one diagnostic")
-        self.expect_diagnostic(report['diagnostics'][0], code=2072, lineNo=12, startEndColumns=(8, 19))
+        self.expect_diagnostic(report['diagnostics'][0], code=2072, lineNo=31, startEndColumns=(8, 19))
 
     def test_textDocument_didChange_updates_diagnostics(self, solc: JsonRpcProcess) -> None:
         self.setup_lsp(solc)
@@ -555,8 +555,8 @@ class SolidityLSPTestSuite: # {{{
                     {
                         'range':
                         {
-                            'start': { 'line': 12, 'character': 1 },
-                            'end':   { 'line': 13, 'character': 1 }
+                            'start': { 'line': 31, 'character': 1 },
+                            'end':   { 'line': 32, 'character': 1 }
                         },
                         'text': ""
                     }
@@ -673,7 +673,7 @@ class SolidityLSPTestSuite: # {{{
         reports = self.wait_for_diagnostics(solc, 2)
         self.expect_equal(len(reports), 2, '')
         self.expect_equal(len(reports[0]['diagnostics']), 0, "should not contain diagnostics")
-        self.expect_diagnostic(reports[1]['diagnostics'][0], 2072, 12, (8, 19)) # unused variable in lib.sol
+        self.expect_diagnostic(reports[1]['diagnostics'][0], 2072, 31, (8, 19)) # unused variable in lib.sol
 
         # Now close the file and expect the warning for lib.sol to be removed
         solc.send_message(
