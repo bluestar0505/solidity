@@ -85,6 +85,28 @@ int toDiagnosticSeverity(Error::Type _errorType)
 	return -1;
 }
 
+vector<Declaration const*> allAnnotatedDeclarations(Identifier const* _identifier)
+{
+	vector<Declaration const*> output;
+	output.push_back(_identifier->annotation().referencedDeclaration);
+	output += _identifier->annotation().candidateDeclarations;
+	return output;
+}
+
+optional<SourceLocation> declarationPosition(Declaration const* _declaration)
+{
+	if (!_declaration)
+		return nullopt;
+
+	if (_declaration->nameLocation().isValid())
+		return _declaration->nameLocation();
+
+	if (_declaration->location().isValid())
+		return _declaration->location();
+
+	return nullopt;
+}
+
 }
 
 LanguageServer::LanguageServer(Transport& _transport):
@@ -96,9 +118,11 @@ LanguageServer::LanguageServer(Transport& _transport):
 		{"initialize", bind(&LanguageServer::handleInitialize, this, _1, _2)},
 		{"initialized", [](auto, auto) {}},
 		{"shutdown", [this](auto, auto) { m_state = State::ShutdownRequested; }},
+		{"textDocument/definition", bind(&LanguageServer::handleGotoDefinition, this, _1, _2)},
 		{"textDocument/didOpen", bind(&LanguageServer::handleTextDocumentDidOpen, this, _2)},
 		{"textDocument/didChange", bind(&LanguageServer::handleTextDocumentDidChange, this, _2)},
 		{"textDocument/didClose", bind(&LanguageServer::handleTextDocumentDidClose, this, _2)},
+		{"textDocument/implementation", bind(&LanguageServer::handleGotoDefinition, this, _1, _2)},
 		{"workspace/didChangeConfiguration", bind(&LanguageServer::handleWorkspaceDidChangeConfiguration, this, _2)},
 	},
 	m_fileRepository("/" /* basePath */),
@@ -315,8 +339,10 @@ void LanguageServer::handleInitialize(MessageID _id, Json::Value const& _args)
 	Json::Value replyArgs;
 	replyArgs["serverInfo"]["name"] = "solc";
 	replyArgs["serverInfo"]["version"] = string(VersionNumber);
-	replyArgs["capabilities"]["textDocumentSync"]["openClose"] = true;
+	replyArgs["capabilities"]["definitionProvider"] = true;
+	replyArgs["capabilities"]["implementationProvider"] = true;
 	replyArgs["capabilities"]["textDocumentSync"]["change"] = 2; // 0=none, 1=full, 2=incremental
+	replyArgs["capabilities"]["textDocumentSync"]["openClose"] = true;
 
 	m_client.reply(_id, move(replyArgs));
 }
@@ -402,3 +428,89 @@ void LanguageServer::handleTextDocumentDidClose(Json::Value const& _args)
 
 	compileAndUpdateDiagnostics();
 }
+
+ASTNode const* LanguageServer::requestASTNode(std::string const& _sourceUnitName, LineColumn const& _filePos)
+{
+	if (m_compilerStack.state() < CompilerStack::AnalysisPerformed)
+		return nullptr;
+
+	if (!m_fileRepository.sourceUnits().count(_sourceUnitName))
+		return nullptr;
+
+	optional<int> sourcePos = m_compilerStack.charStream(_sourceUnitName)
+		.translateLineColumnToPosition(_filePos);
+	if (!sourcePos.has_value())
+		return nullptr;
+
+	return locateInnermostASTNode(*sourcePos, m_compilerStack.ast(_sourceUnitName));
+}
+
+void LanguageServer::handleGotoDefinition(MessageID _id, Json::Value const& _args)
+{
+	string const uri = _args["textDocument"]["uri"].asString();
+	string const sourceUnitName = m_fileRepository.clientPathToSourceUnitName(uri);
+	if (!m_fileRepository.sourceUnits().count(sourceUnitName))
+	{
+		m_client.error(_id, ErrorCode::RequestFailed, "Unknown file: " + uri);
+		return;
+	}
+
+	auto const lineColumn = parseLineColumn(_args["position"]);
+	if (!lineColumn)
+	{
+		m_client.error(
+			_id,
+			ErrorCode::RequestFailed,
+			fmt::format(
+				"Unknown position {line}:{column} in file: {file}",
+				fmt::arg("line", lineColumn.value().line),
+				fmt::arg("column", lineColumn.value().column),
+				fmt::arg("file", sourceUnitName)
+			)
+		);
+		return;
+	}
+
+	ASTNode const* sourceNode = requestASTNode(sourceUnitName, lineColumn.value());
+	vector<SourceLocation> locations;
+	if (auto const* identifier = dynamic_cast<Identifier const*>(sourceNode))
+	{
+		for (auto const* declaration: allAnnotatedDeclarations(identifier))
+			if (auto location = declarationPosition(declaration); location.has_value())
+				locations.emplace_back(move(location.value()));
+	}
+	else if (auto const* identifierPath = dynamic_cast<IdentifierPath const*>(sourceNode))
+	{
+		if (auto const* declaration = identifierPath->annotation().referencedDeclaration)
+			if (auto location = declarationPosition(declaration); location.has_value())
+				locations.emplace_back(move(location.value()));
+	}
+	else if (auto const* memberAccess = dynamic_cast<MemberAccess const*>(sourceNode))
+	{
+		auto const location = declarationPosition(memberAccess->annotation().referencedDeclaration);
+		if (location.has_value())
+			locations.emplace_back(location.value());
+	}
+	else if (auto const* importDirective = dynamic_cast<ImportDirective const*>(sourceNode))
+	{
+		auto const& path = *importDirective->annotation().absolutePath;
+		if (m_fileRepository.sourceUnits().count(path))
+			locations.emplace_back(SourceLocation{0, 0, make_shared<string const>(path)});
+	}
+	else if (auto const* declaration = dynamic_cast<Declaration const*>(sourceNode))
+	{
+		if (auto location = declarationPosition(declaration); location.has_value())
+			locations.emplace_back(move(location.value()));
+	}
+	else if (sourceNode)
+	{
+		m_client.error(_id, ErrorCode::InternalError, fmt::format("Could not infer def of {}", typeid(*sourceNode).name()));
+		return;
+	}
+
+	Json::Value reply = Json::arrayValue;
+	for (SourceLocation const& location: locations)
+		reply.append(toJson(location));
+	m_client.reply(_id, reply);
+}
+

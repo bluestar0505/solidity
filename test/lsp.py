@@ -744,6 +744,30 @@ class SolidityLSPTestSuite: # {{{
         self.expect_equal(len(report3['diagnostics']), 1, "one diagnostic")
         self.expect_diagnostic(report3['diagnostics'][0], 4126, 6, (1, 23))
 
+    def test_textDocument_definition(self, solc: JsonRpcProcess) -> None:
+        self.setup_lsp(solc)
+        FILE_NAME = 'goto_definition'
+        FILE_URI = self.get_test_file_uri(FILE_NAME)
+        solc.send_message('textDocument/didOpen', {
+            'textDocument': {
+                'uri': FILE_URI,
+                'languageId': 'Solidity',
+                'version': 1,
+                'text': self.get_test_file_contents(FILE_NAME)
+            }
+        })
+        published_diagnostics = self.wait_for_diagnostics(solc, 2)
+        self.expect_equal(len(published_diagnostics), 2, "publish diagnostics for 2 files")
+        self.expect_equal(len(published_diagnostics[0]['diagnostics']), 0)
+        self.expect_equal(len(published_diagnostics[1]['diagnostics']), 1)
+        self.expect_diagnostic(published_diagnostics[1]['diagnostics'][0], 2072, 31, (8, 19)) # unused variable in lib.sol
+
+        # TODO: goto definition on
+        # enum value symbols
+        # enum var
+        # primitive data types var
+        # type symbol to jump to type defs (error, contract, enum, ...)
+
     def test_textDocument_didChange_empty_file(self, solc: JsonRpcProcess) -> None:
         """
         Starts with an empty file and changes it to look like
