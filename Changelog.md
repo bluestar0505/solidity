@@ -9,6 +9,7 @@ Compiler Features:
 
 
 Bugfixes:
+ * Control Flow Graph: Fix modifiers not being analyzed
 
 
 Solc-Js:
