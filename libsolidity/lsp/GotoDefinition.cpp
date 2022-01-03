@@ -79,8 +79,6 @@ void GotoDefinition::operator()(MessageID _id, Json::Value const& _args)
 		if (auto location = declarationPosition(declaration); location.has_value())
 			locations.emplace_back(move(location.value()));
 	}
-	else if (sourceNode)
-		throw HandlerError(_id, ErrorCode::InternalError, fmt::format("Could not infer def of {}", typeid(*sourceNode).name()));
 
 	Json::Value reply = Json::arrayValue;
 	for (SourceLocation const& location: locations)
