@@ -81,9 +81,7 @@ vector<Declaration const*> allAnnotatedDeclarations(Expression const* _expressio
 	}
 	else if (auto const* memberAccess = dynamic_cast<MemberAccess const*>(_expression))
 	{
-		auto const location = declarationPosition(memberAccess->annotation().referencedDeclaration);
-		if (location.has_value())
-			output.emplace_back(location.value());
+		output.push_back(memberAccess->annotation().referencedDeclaration);
 	}
 
 	return output;

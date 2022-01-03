@@ -20,14 +20,6 @@ using namespace solidity::langutil;
 namespace solidity::lsp
 {
 
-GotoDefinition::GotoDefinition(LanguageServer& _server):
-	m_server{_server},
-	m_charStreamProvider{_server.charStreamProvider()},
-	m_fileRepository{_server.fileRepository()},
-	m_client{_server.client()}
-{
-}
-
 void GotoDefinition::operator()(MessageID _id, Json::Value const& _args)
 {
 	string const uri = _args["textDocument"]["uri"].asString();

@@ -3,18 +3,12 @@
 namespace solidity::lsp
 {
 
-class GotoDefinition
+class GotoDefinition: public Handler
 {
 public:
-	explicit GotoDefinition(LanguageServer& _server);
+	explicit GotoDefinition(LanguageServer& _server): Handler(_server) {}
 
 	void operator()(MessageID, Json::Value const&);
-
-private:
-	LanguageServer& m_server;
-	langutil::CharStreamProvider const& m_charStreamProvider;
-	FileRepository const& m_fileRepository;
-	Transport& m_client;
 };
 
 }

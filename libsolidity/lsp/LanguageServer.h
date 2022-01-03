@@ -109,4 +109,17 @@ private:
 	Json::Value m_settingsObject;
 };
 
+// Helper base class for implementing handlers.
+class Handler
+{
+public:
+	explicit Handler(LanguageServer& _server);
+
+protected:
+	LanguageServer& m_server;
+	langutil::CharStreamProvider const& m_charStreamProvider;
+	FileRepository const& m_fileRepository;
+	Transport& m_client;
+};
+
 }
