@@ -113,7 +113,12 @@ private:
 class Handler
 {
 public:
-	explicit Handler(LanguageServer& _server);
+	explicit Handler(LanguageServer& _server):
+		m_server{_server},
+		m_charStreamProvider{_server.charStreamProvider()},
+		m_fileRepository{_server.fileRepository()},
+		m_client{_server.client()}
+	{}
 
 protected:
 	LanguageServer& m_server;

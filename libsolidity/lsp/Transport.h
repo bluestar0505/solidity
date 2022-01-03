@@ -61,7 +61,7 @@ public:
 	MessageID id() const noexcept { return m_id; }
 	ErrorCode code() const noexcept { return m_code; }
 	std::string const& message() const noexcept { return m_message; }
-    char const* what() const noexcept override { return m_message.c_str(); }
+	char const* what() const noexcept override { return m_message.c_str(); }
 
 private:
 	MessageID m_id;
