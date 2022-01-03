@@ -84,9 +84,9 @@ private:
 	std::optional<langutil::SourceLocation> parseRange(
 		std::string const& _sourceUnitName,
 		Json::Value const& _range
-	) const;
-	Json::Value toRange(langutil::SourceLocation const& _location) const;
-	Json::Value toJson(langutil::SourceLocation const& _location) const;
+	);
+	Json::Value toRange(langutil::SourceLocation const& _location);
+	Json::Value toJson(langutil::SourceLocation const& _location);
 
 	// LSP related member fields
 	using MessageHandler = std::function<void(MessageID, Json::Value const&)>;
@@ -107,24 +107,6 @@ private:
 
 	/// User-supplied custom configuration settings (such as EVM version).
 	Json::Value m_settingsObject;
-};
-
-// Helper base class for implementing handlers.
-class Handler
-{
-public:
-	explicit Handler(LanguageServer& _server):
-		m_server{_server},
-		m_charStreamProvider{_server.charStreamProvider()},
-		m_fileRepository{_server.fileRepository()},
-		m_client{_server.client()}
-	{}
-
-protected:
-	LanguageServer& m_server;
-	langutil::CharStreamProvider const& m_charStreamProvider;
-	FileRepository const& m_fileRepository;
-	Transport& m_client;
 };
 
 }

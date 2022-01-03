@@ -21,6 +21,7 @@
 #include <libsolidity/interface/ReadFile.h>
 #include <libsolidity/interface/StandardCompiler.h>
 #include <libsolidity/lsp/LanguageServer.h>
+#include <libsolidity/lsp/Handler.h>
 #include <libsolidity/lsp/Utils.h>
 
 // LSP feature implementations
@@ -87,19 +88,19 @@ LanguageServer::LanguageServer(Transport& _transport):
 {
 }
 
-optional<SourceLocation> LanguageServer::parseRange(string const& _sourceUnitName, Json::Value const& _range) const
+optional<SourceLocation> LanguageServer::parseRange(string const& _sourceUnitName, Json::Value const& _range)
 {
-	return lsp::parseRange(m_fileRepository, _sourceUnitName, _range);
+	return Handler{*this}.parseRange(_sourceUnitName, _range);
 }
 
-Json::Value LanguageServer::toRange(SourceLocation const& _location) const
+Json::Value LanguageServer::toRange(SourceLocation const& _location)
 {
-	return lsp::toRange(charStreamProvider(), _location);
+	return Handler(*this).toRange(_location);
 }
 
-Json::Value LanguageServer::toJson(SourceLocation const& _location) const
+Json::Value LanguageServer::toJson(SourceLocation const& _location)
 {
-	return lsp::toJson(charStreamProvider(), m_fileRepository, _location);
+	return Handler(*this).toJson(_location);
 }
 
 void LanguageServer::changeConfiguration(Json::Value const& _settings)

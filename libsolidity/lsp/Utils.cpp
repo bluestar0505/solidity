@@ -7,18 +7,9 @@
 namespace solidity::lsp
 {
 
-using langutil::CharStream;
-using langutil::LineColumn;
-using langutil::SourceLocation;
-
 using namespace frontend;
-
-using std::max;
-using std::make_shared;
-using std::nullopt;
-using std::optional;
-using std::string;
-using std::vector;
+using namespace langutil;
+using namespace std;
 
 optional<LineColumn> parseLineColumn(Json::Value const& _lineColumn)
 {
@@ -43,31 +34,6 @@ Json::Value toJsonRange(LineColumn const& _start, LineColumn const& _end)
 	json["start"] = toJson(_start);
 	json["end"] = toJson(_end);
 	return json;
-}
-
-Json::Value toRange(langutil::CharStreamProvider const& _charStreamProvider, SourceLocation const& _location)
-{
-	if (!_location.hasText())
-		return toJsonRange({}, {});
-
-	solAssert(_location.sourceName, "");
-	langutil::CharStream const& stream = _charStreamProvider.charStream(*_location.sourceName);
-	LineColumn start = stream.translatePositionToLineColumn(_location.start);
-	LineColumn end = stream.translatePositionToLineColumn(_location.end);
-	return toJsonRange(start, end);
-}
-
-Json::Value toJson(
-	langutil::CharStreamProvider const& _charStreamProvider,
-	FileRepository const& _fileRepository,
-	SourceLocation const& _location
-)
-{
-	solAssert(_location.sourceName);
-	Json::Value item = Json::objectValue;
-	item["uri"] = _fileRepository.sourceUnitNameToClientPath(*_location.sourceName);
-	item["range"] = toRange(_charStreamProvider, _location);
-	return item;
 }
 
 vector<Declaration const*> allAnnotatedDeclarations(Expression const* _expression)
@@ -101,38 +67,4 @@ optional<SourceLocation> declarationPosition(Declaration const* _declaration)
 	return nullopt;
 }
 
-optional<SourceLocation> parsePosition(
-	FileRepository const& _fileRepository,
-	string const& _sourceUnitName,
-	Json::Value const& _position
-)
-{
-	if (!_fileRepository.sourceUnits().count(_sourceUnitName))
-		return nullopt;
-
-	if (optional<LineColumn> lineColumn = parseLineColumn(_position))
-		if (optional<int> const offset = CharStream::translateLineColumnToPosition(
-			_fileRepository.sourceUnits().at(_sourceUnitName),
-			*lineColumn
-		))
-			return SourceLocation{*offset, *offset, make_shared<string>(_sourceUnitName)};
-	return nullopt;
-}
-
-optional<SourceLocation> parseRange(
-	FileRepository const& _fileRepository,
-	string const& _sourceUnitName,
-	Json::Value const& _range
-)
-{
-	if (!_range.isObject())
-		return nullopt;
-	optional<SourceLocation> start = parsePosition(_fileRepository, _sourceUnitName, _range["start"]);
-	optional<SourceLocation> end = parsePosition(_fileRepository, _sourceUnitName, _range["end"]);
-	if (!start || !end)
-		return nullopt;
-	solAssert(*start->sourceName == *end->sourceName);
-	start->end = end->end;
-	return start;
-}
 }

@@ -1,4 +1,4 @@
-#include <libsolidity/lsp/LanguageServer.h>
+#include <libsolidity/lsp/Handler.h>
 
 namespace solidity::lsp
 {

@@ -159,6 +159,8 @@ set(sources
 	lsp/FileRepository.h
 	lsp/GotoDefinition.cpp
 	lsp/GotoDefinition.h
+	lsp/Handler.cpp
+	lsp/Handler.h
 	lsp/LanguageServer.cpp
 	lsp/LanguageServer.h
 	lsp/Transport.cpp

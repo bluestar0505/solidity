@@ -69,7 +69,7 @@ void GotoDefinition::operator()(MessageID _id, Json::Value const& _args)
 
 	Json::Value reply = Json::arrayValue;
 	for (SourceLocation const& location: locations)
-		reply.append(toJson(m_server.charStreamProvider(), m_fileRepository, location));
+		reply.append(toJson(location));
 	m_client.reply(_id, reply);
 }
 
