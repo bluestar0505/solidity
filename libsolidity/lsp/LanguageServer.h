@@ -57,6 +57,11 @@ public:
 	/// @return boolean indicating normal or abnormal termination.
 	bool run();
 
+	FileRepository& fileRepository() noexcept { return m_fileRepository; }
+	Transport& client() noexcept { return m_client; }
+	frontend::ASTNode const* requestASTNode(std::string const& _sourceUnitName, langutil::LineColumn const& _filePos);
+	langutil::CharStreamProvider const& charStreamProvider() const noexcept { return m_compilerStack; }
+
 private:
 	/// Checks if the server is initialized (to be used by messages that need it to be initialized).
 	/// Reports an error and returns false if not.
@@ -68,18 +73,12 @@ private:
 	void handleTextDocumentDidClose(Json::Value const& _args);
 	void handleGotoDefinition(MessageID _id, Json::Value const& _args);
 
-	frontend::ASTNode const* requestASTNode(std::string const& _sourceUnitName, langutil::LineColumn const& _filePos);
-
 	/// Invoked when the server user-supplied configuration changes (initiated by the client).
 	void changeConfiguration(Json::Value const&);
 
 	/// Compile everything until after analysis phase.
 	void compile();
 
-	std::optional<langutil::SourceLocation> parsePosition(
-		std::string const& _sourceUnitName,
-		Json::Value const& _position
-	) const;
 	/// @returns the source location given a source unit name and an LSP Range object,
 	/// or nullopt on failure.
 	std::optional<langutil::SourceLocation> parseRange(

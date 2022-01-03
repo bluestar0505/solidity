@@ -21,6 +21,7 @@
 #include <libsolidity/interface/ReadFile.h>
 #include <libsolidity/interface/StandardCompiler.h>
 #include <libsolidity/lsp/LanguageServer.h>
+#include <libsolidity/lsp/Utils.h>
 
 #include <liblangutil/SourceReferenceExtractor.h>
 #include <liblangutil/CharStream.h>
@@ -47,31 +48,6 @@ using namespace solidity::frontend;
 namespace
 {
 
-Json::Value toJson(LineColumn _pos)
-{
-	Json::Value json = Json::objectValue;
-	json["line"] = max(_pos.line, 0);
-	json["character"] = max(_pos.column, 0);
-
-	return json;
-}
-
-Json::Value toJsonRange(LineColumn const& _start, LineColumn const& _end)
-{
-	Json::Value json;
-	json["start"] = toJson(_start);
-	json["end"] = toJson(_end);
-	return json;
-}
-
-optional<LineColumn> parseLineColumn(Json::Value const& _lineColumn)
-{
-	if (_lineColumn.isObject() && _lineColumn["line"].isInt() && _lineColumn["character"].isInt())
-		return LineColumn{_lineColumn["line"].asInt(), _lineColumn["character"].asInt()};
-	else
-		return nullopt;
-}
-
 int toDiagnosticSeverity(Error::Type _errorType)
 {
 	// 1=Error, 2=Warning, 3=Info, 4=Hint
@@ -83,28 +59,6 @@ int toDiagnosticSeverity(Error::Type _errorType)
 	}
 	solAssert(false);
 	return -1;
-}
-
-vector<Declaration const*> allAnnotatedDeclarations(Identifier const* _identifier)
-{
-	vector<Declaration const*> output;
-	output.push_back(_identifier->annotation().referencedDeclaration);
-	output += _identifier->annotation().candidateDeclarations;
-	return output;
-}
-
-optional<SourceLocation> declarationPosition(Declaration const* _declaration)
-{
-	if (!_declaration)
-		return nullopt;
-
-	if (_declaration->nameLocation().isValid())
-		return _declaration->nameLocation();
-
-	if (_declaration->location().isValid())
-		return _declaration->location();
-
-	return nullopt;
 }
 
 }
@@ -130,55 +84,19 @@ LanguageServer::LanguageServer(Transport& _transport):
 {
 }
 
-optional<SourceLocation> LanguageServer::parsePosition(
-	string const& _sourceUnitName,
-	Json::Value const& _position
-) const
-{
-	if (!m_fileRepository.sourceUnits().count(_sourceUnitName))
-		return nullopt;
-
-	if (optional<LineColumn> lineColumn = parseLineColumn(_position))
-		if (optional<int> const offset = CharStream::translateLineColumnToPosition(
-			m_fileRepository.sourceUnits().at(_sourceUnitName),
-			*lineColumn
-		))
-			return SourceLocation{*offset, *offset, make_shared<string>(_sourceUnitName)};
-	return nullopt;
-}
-
 optional<SourceLocation> LanguageServer::parseRange(string const& _sourceUnitName, Json::Value const& _range) const
 {
-	if (!_range.isObject())
-		return nullopt;
-	optional<SourceLocation> start = parsePosition(_sourceUnitName, _range["start"]);
-	optional<SourceLocation> end = parsePosition(_sourceUnitName, _range["end"]);
-	if (!start || !end)
-		return nullopt;
-	solAssert(*start->sourceName == *end->sourceName);
-	start->end = end->end;
-	return start;
+	return lsp::parseRange(m_fileRepository, _sourceUnitName, _range);
 }
 
 Json::Value LanguageServer::toRange(SourceLocation const& _location) const
 {
-	if (!_location.hasText())
-		return toJsonRange({}, {});
-
-	solAssert(_location.sourceName, "");
-	CharStream const& stream = m_compilerStack.charStream(*_location.sourceName);
-	LineColumn start = stream.translatePositionToLineColumn(_location.start);
-	LineColumn end = stream.translatePositionToLineColumn(_location.end);
-	return toJsonRange(start, end);
+	return lsp::toRange(charStreamProvider(), _location);
 }
 
 Json::Value LanguageServer::toJson(SourceLocation const& _location) const
 {
-	solAssert(_location.sourceName);
-	Json::Value item = Json::objectValue;
-	item["uri"] = m_fileRepository.sourceUnitNameToClientPath(*_location.sourceName);
-	item["range"] = toRange(_location);
-	return item;
+	return lsp::toJson(charStreamProvider(), m_fileRepository, _location);
 }
 
 void LanguageServer::changeConfiguration(Json::Value const& _settings)
