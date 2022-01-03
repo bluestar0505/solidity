@@ -33,15 +33,11 @@ void GotoDefinition::operator()(MessageID _id, Json::Value const& _args)
 	string const uri = _args["textDocument"]["uri"].asString();
 	string const sourceUnitName = m_fileRepository.clientPathToSourceUnitName(uri);
 	if (!m_fileRepository.sourceUnits().count(sourceUnitName))
-	{
-		m_client.error(_id, ErrorCode::RequestFailed, "Unknown file: " + uri);
-		return;
-	}
+		throw HandlerError(_id, ErrorCode::RequestFailed, "Unknown file: " + uri);
 
 	auto const lineColumn = parseLineColumn(_args["position"]);
 	if (!lineColumn)
-	{
-		m_client.error(
+		throw HandlerError(
 			_id,
 			ErrorCode::RequestFailed,
 			fmt::format(
@@ -51,8 +47,6 @@ void GotoDefinition::operator()(MessageID _id, Json::Value const& _args)
 				fmt::arg("file", sourceUnitName)
 			)
 		);
-		return;
-	}
 
 	ASTNode const* sourceNode = m_server.requestASTNode(sourceUnitName, lineColumn.value());
 	vector<SourceLocation> locations;
@@ -86,10 +80,7 @@ void GotoDefinition::operator()(MessageID _id, Json::Value const& _args)
 			locations.emplace_back(move(location.value()));
 	}
 	else if (sourceNode)
-	{
-		m_client.error(_id, ErrorCode::InternalError, fmt::format("Could not infer def of {}", typeid(*sourceNode).name()));
-		return;
-	}
+		throw HandlerError(_id, ErrorCode::InternalError, fmt::format("Could not infer def of {}", typeid(*sourceNode).name()));
 
 	Json::Value reply = Json::arrayValue;
 	for (SourceLocation const& location: locations)
