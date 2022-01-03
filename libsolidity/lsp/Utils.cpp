@@ -11,8 +11,7 @@ using langutil::CharStream;
 using langutil::LineColumn;
 using langutil::SourceLocation;
 
-using frontend::Declaration;
-using frontend::Identifier;
+using namespace frontend;
 
 using std::max;
 using std::make_shared;
@@ -71,11 +70,22 @@ Json::Value toJson(
 	return item;
 }
 
-vector<Declaration const*> allAnnotatedDeclarations(Identifier const* _identifier)
+vector<Declaration const*> allAnnotatedDeclarations(Expression const* _expression)
 {
 	vector<Declaration const*> output;
-	output.push_back(_identifier->annotation().referencedDeclaration);
-	output += _identifier->annotation().candidateDeclarations;
+
+	if (auto const* identifier = dynamic_cast<Identifier const*>(_expression))
+	{
+		output.push_back(identifier->annotation().referencedDeclaration);
+		output += identifier->annotation().candidateDeclarations;
+	}
+	else if (auto const* memberAccess = dynamic_cast<MemberAccess const*>(_expression))
+	{
+		auto const location = declarationPosition(memberAccess->annotation().referencedDeclaration);
+		if (location.has_value())
+			output.emplace_back(location.value());
+	}
+
 	return output;
 }
 

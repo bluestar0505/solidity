@@ -34,7 +34,7 @@ Json::Value toJson(
 	langutil::SourceLocation const& _location
 );
 
-std::vector<frontend::Declaration const*> allAnnotatedDeclarations(frontend::Identifier const* _identifier);
+std::vector<frontend::Declaration const*> allAnnotatedDeclarations(frontend::Expression const* _expression);
 std::optional<langutil::SourceLocation> declarationPosition(frontend::Declaration const* _declaration);
 
 std::optional<langutil::SourceLocation> parsePosition(

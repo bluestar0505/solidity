@@ -50,9 +50,10 @@ void GotoDefinition::operator()(MessageID _id, Json::Value const& _args)
 
 	ASTNode const* sourceNode = m_server.requestASTNode(sourceUnitName, lineColumn.value());
 	vector<SourceLocation> locations;
-	if (auto const* identifier = dynamic_cast<Identifier const*>(sourceNode))
+	if (auto const* expression = dynamic_cast<Expression const*>(sourceNode))
 	{
-		for (auto const* declaration: allAnnotatedDeclarations(identifier))
+		// Handles all expressions that can have one or more declaration annotation.
+		for (auto const* declaration: allAnnotatedDeclarations(expression))
 			if (auto location = declarationPosition(declaration); location.has_value())
 				locations.emplace_back(move(location.value()));
 	}
@@ -61,12 +62,6 @@ void GotoDefinition::operator()(MessageID _id, Json::Value const& _args)
 		if (auto const* declaration = identifierPath->annotation().referencedDeclaration)
 			if (auto location = declarationPosition(declaration); location.has_value())
 				locations.emplace_back(move(location.value()));
-	}
-	else if (auto const* memberAccess = dynamic_cast<MemberAccess const*>(sourceNode))
-	{
-		auto const location = declarationPosition(memberAccess->annotation().referencedDeclaration);
-		if (location.has_value())
-			locations.emplace_back(location.value());
 	}
 	else if (auto const* importDirective = dynamic_cast<ImportDirective const*>(sourceNode))
 	{
@@ -85,6 +80,5 @@ void GotoDefinition::operator()(MessageID _id, Json::Value const& _args)
 		reply.append(toJson(m_server.charStreamProvider(), m_fileRepository, location));
 	m_client.reply(_id, reply);
 }
-
 
 }
