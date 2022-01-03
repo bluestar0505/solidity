@@ -23,6 +23,9 @@
 #include <libsolidity/lsp/LanguageServer.h>
 #include <libsolidity/lsp/Utils.h>
 
+// LSP feature implementations
+#include <libsolidity/lsp/GotoDefinition.h>
+
 #include <liblangutil/SourceReferenceExtractor.h>
 #include <liblangutil/CharStream.h>
 
@@ -72,11 +75,11 @@ LanguageServer::LanguageServer(Transport& _transport):
 		{"initialize", bind(&LanguageServer::handleInitialize, this, _1, _2)},
 		{"initialized", [](auto, auto) {}},
 		{"shutdown", [this](auto, auto) { m_state = State::ShutdownRequested; }},
-		{"textDocument/definition", bind(&LanguageServer::handleGotoDefinition, this, _1, _2)},
+		{"textDocument/definition", GotoDefinition(*this) },
 		{"textDocument/didOpen", bind(&LanguageServer::handleTextDocumentDidOpen, this, _2)},
 		{"textDocument/didChange", bind(&LanguageServer::handleTextDocumentDidChange, this, _2)},
 		{"textDocument/didClose", bind(&LanguageServer::handleTextDocumentDidClose, this, _2)},
-		{"textDocument/implementation", bind(&LanguageServer::handleGotoDefinition, this, _1, _2)},
+		{"textDocument/implementation", GotoDefinition(*this) },
 		{"workspace/didChangeConfiguration", bind(&LanguageServer::handleWorkspaceDidChangeConfiguration, this, _2)},
 	},
 	m_fileRepository("/" /* basePath */),
@@ -361,74 +364,5 @@ ASTNode const* LanguageServer::requestASTNode(std::string const& _sourceUnitName
 		return nullptr;
 
 	return locateInnermostASTNode(*sourcePos, m_compilerStack.ast(_sourceUnitName));
-}
-
-void LanguageServer::handleGotoDefinition(MessageID _id, Json::Value const& _args)
-{
-	string const uri = _args["textDocument"]["uri"].asString();
-	string const sourceUnitName = m_fileRepository.clientPathToSourceUnitName(uri);
-	if (!m_fileRepository.sourceUnits().count(sourceUnitName))
-	{
-		m_client.error(_id, ErrorCode::RequestFailed, "Unknown file: " + uri);
-		return;
-	}
-
-	auto const lineColumn = parseLineColumn(_args["position"]);
-	if (!lineColumn)
-	{
-		m_client.error(
-			_id,
-			ErrorCode::RequestFailed,
-			fmt::format(
-				"Unknown position {line}:{column} in file: {file}",
-				fmt::arg("line", lineColumn.value().line),
-				fmt::arg("column", lineColumn.value().column),
-				fmt::arg("file", sourceUnitName)
-			)
-		);
-		return;
-	}
-
-	ASTNode const* sourceNode = requestASTNode(sourceUnitName, lineColumn.value());
-	vector<SourceLocation> locations;
-	if (auto const* identifier = dynamic_cast<Identifier const*>(sourceNode))
-	{
-		for (auto const* declaration: allAnnotatedDeclarations(identifier))
-			if (auto location = declarationPosition(declaration); location.has_value())
-				locations.emplace_back(move(location.value()));
-	}
-	else if (auto const* identifierPath = dynamic_cast<IdentifierPath const*>(sourceNode))
-	{
-		if (auto const* declaration = identifierPath->annotation().referencedDeclaration)
-			if (auto location = declarationPosition(declaration); location.has_value())
-				locations.emplace_back(move(location.value()));
-	}
-	else if (auto const* memberAccess = dynamic_cast<MemberAccess const*>(sourceNode))
-	{
-		auto const location = declarationPosition(memberAccess->annotation().referencedDeclaration);
-		if (location.has_value())
-			locations.emplace_back(location.value());
-	}
-	else if (auto const* importDirective = dynamic_cast<ImportDirective const*>(sourceNode))
-	{
-		auto const& path = *importDirective->annotation().absolutePath;
-		if (m_fileRepository.sourceUnits().count(path))
-			locations.emplace_back(SourceLocation{0, 0, make_shared<string const>(path)});
-	}
-	else if (auto const* declaration = dynamic_cast<Declaration const*>(sourceNode))
-	{
-		if (auto location = declarationPosition(declaration); location.has_value())
-			locations.emplace_back(move(location.value()));
-	}
-	else if (sourceNode)
-	{
-		m_client.error(_id, ErrorCode::InternalError, fmt::format("Could not infer def of {}", typeid(*sourceNode).name()));
-		return;
-	}
-
-	Json::Value reply = Json::arrayValue;
-	for (SourceLocation const& location: locations)
-		reply.append(toJson(location));
-	m_client.reply(_id, reply);
 }
 
