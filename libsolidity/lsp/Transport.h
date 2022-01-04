@@ -47,24 +47,21 @@ enum class ErrorCode
 	RequestFailed = -32803
 };
 
-// Error exception used to bail out on errors in the LSP function-call handlers.
+/**
+ * Error exception used to bail out on errors in the LSP function-call handlers.
+ */
 class RequestError: public util::Exception
 {
 public:
-	RequestError(ErrorCode _code, std::string _message):
-		m_code{_code},
-		m_message{std::move(_message)}
+	explicit RequestError(ErrorCode _code):
+		m_code{_code}
 	{
 	}
 
 	ErrorCode code() const noexcept { return m_code; }
-	std::string const& message() const noexcept { return m_message; }
-
-	char const* what() const noexcept override { return m_message.c_str(); }
 
 private:
 	ErrorCode m_code;
-	std::string m_message;
 };
 
 /**

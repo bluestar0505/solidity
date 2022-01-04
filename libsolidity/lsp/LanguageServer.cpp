@@ -262,7 +262,7 @@ bool LanguageServer::run()
 		}
 		catch (RequestError const& error)
 		{
-			m_client.error(id, error.code(), error.message() + " " + boost::current_exception_diagnostic_information());
+			m_client.error(id, error.code(), boost::current_exception_diagnostic_information());
 		}
 		catch (...)
 		{
@@ -275,13 +275,19 @@ bool LanguageServer::run()
 void LanguageServer::requireServerInitialized()
 {
 	if (m_state != State::Initialized)
-		BOOST_THROW_EXCEPTION(RequestError(ErrorCode::ServerNotInitialized, "Server is not properly initialized."));
+		BOOST_THROW_EXCEPTION(
+			RequestError(ErrorCode::ServerNotInitialized) <<
+			errinfo_comment("Server is not properly initialized.")
+		);
 }
 
 void LanguageServer::handleInitialize(MessageID _id, Json::Value const& _args)
 {
 	if (m_state != State::Started)
-		BOOST_THROW_EXCEPTION(RequestError(ErrorCode::RequestFailed, "Initialize called at the wrong time."));
+		BOOST_THROW_EXCEPTION(
+			RequestError(ErrorCode::RequestFailed) <<
+			errinfo_comment("Initialize called at the wrong time.")
+		);
 
 	m_state = State::Initialized;
 
@@ -292,7 +298,10 @@ void LanguageServer::handleInitialize(MessageID _id, Json::Value const& _args)
 	{
 		rootPath = uri.asString();
 		if (!boost::starts_with(rootPath, "file://"))
-			BOOST_THROW_EXCEPTION(RequestError(ErrorCode::InvalidParams, "rootUri only supports file URI scheme."));
+			BOOST_THROW_EXCEPTION(
+				RequestError(ErrorCode::InvalidParams) <<
+				errinfo_comment("rootUri only supports file URI scheme.")
+			);
 
 		rootPath = rootPath.substr(7);
 	}
@@ -325,7 +334,10 @@ void LanguageServer::handleTextDocumentDidOpen(Json::Value const& _args)
 	requireServerInitialized();
 
 	if (!_args["textDocument"])
-		BOOST_THROW_EXCEPTION(RequestError(ErrorCode::RequestFailed, "Text document parameter missing."));
+		BOOST_THROW_EXCEPTION(
+			RequestError(ErrorCode::RequestFailed) <<
+			errinfo_comment("Text document parameter missing.")
+		);
 
 	string text = _args["textDocument"]["text"].asString();
 	string uri = _args["textDocument"]["uri"].asString();
@@ -343,21 +355,27 @@ void LanguageServer::handleTextDocumentDidChange(Json::Value const& _args)
 	for (Json::Value jsonContentChange: _args["contentChanges"])
 	{
 		if (!jsonContentChange.isObject())
-			BOOST_THROW_EXCEPTION(RequestError(ErrorCode::RequestFailed, "Invalid content reference."));
+			BOOST_THROW_EXCEPTION(
+				RequestError(ErrorCode::RequestFailed) <<
+				errinfo_comment("Invalid content reference.")
+			);
 
 		string const sourceUnitName = m_fileRepository.clientPathToSourceUnitName(uri);
 		if (!m_fileRepository.sourceUnits().count(sourceUnitName))
-			BOOST_THROW_EXCEPTION(RequestError(ErrorCode::RequestFailed, "Unknown file: " + uri));
+			BOOST_THROW_EXCEPTION(
+				RequestError(ErrorCode::RequestFailed) <<
+				errinfo_comment("Unknown file: " + uri)
+			);
 
 		string text = jsonContentChange["text"].asString();
 		if (jsonContentChange["range"].isObject()) // otherwise full content update
 		{
 			optional<SourceLocation> change = parseRange(sourceUnitName, jsonContentChange["range"]);
 			if (!change || !change->hasText())
-				BOOST_THROW_EXCEPTION(RequestError(
-					ErrorCode::RequestFailed,
-					"Invalid source range: " + jsonCompactPrint(jsonContentChange["range"])
-				));
+				BOOST_THROW_EXCEPTION(
+					RequestError(ErrorCode::RequestFailed) <<
+					errinfo_comment("Invalid source range: " + jsonCompactPrint(jsonContentChange["range"]))
+				);
 
 			string buffer = m_fileRepository.sourceUnits().at(sourceUnitName);
 			buffer.replace(static_cast<size_t>(change->start), static_cast<size_t>(change->end - change->start), move(text));
@@ -374,7 +392,10 @@ void LanguageServer::handleTextDocumentDidClose(Json::Value const& _args)
 	requireServerInitialized();
 
 	if (!_args["textDocument"])
-		BOOST_THROW_EXCEPTION(RequestError(ErrorCode::RequestFailed, "Text document parameter missing."));
+		BOOST_THROW_EXCEPTION(
+			RequestError(ErrorCode::RequestFailed) <<
+			errinfo_comment("Text document parameter missing.")
+		);
 
 	string uri = _args["textDocument"]["uri"].asString();
 	m_openFiles.erase(uri);
