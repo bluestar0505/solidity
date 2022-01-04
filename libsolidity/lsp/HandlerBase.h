@@ -14,10 +14,10 @@ namespace solidity::lsp
 class Transport;
 
 // Helper base class for implementing handlers.
-class Handler
+class HandlerBase
 {
 public:
-	explicit Handler(LanguageServer& _server);
+	explicit HandlerBase(LanguageServer& _server);
 
 	Json::Value toRange(langutil::SourceLocation const& _location) const;
 	Json::Value toJson(langutil::SourceLocation const& _location) const;

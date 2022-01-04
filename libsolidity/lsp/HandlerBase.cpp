@@ -1,4 +1,4 @@
-#include <libsolidity/lsp/Handler.h>
+#include <libsolidity/lsp/HandlerBase.h>
 #include <libsolidity/lsp/LanguageServer.h>
 #include <libsolidity/lsp/Utils.h>
 #include <libsolidity/ast/AST.h>
@@ -12,7 +12,7 @@ namespace solidity::lsp
 
 using namespace langutil;
 
-Handler::Handler(LanguageServer& _server):
+HandlerBase::HandlerBase(LanguageServer& _server):
 	m_server{_server},
 	m_charStreamProvider{_server.charStreamProvider()},
 	m_fileRepository{_server.fileRepository()},
@@ -20,7 +20,7 @@ Handler::Handler(LanguageServer& _server):
 {
 }
 
-Json::Value Handler::toRange(SourceLocation const& _location) const
+Json::Value HandlerBase::toRange(SourceLocation const& _location) const
 {
 	if (!_location.hasText())
 		return toJsonRange({}, {});
@@ -32,7 +32,7 @@ Json::Value Handler::toRange(SourceLocation const& _location) const
 	return toJsonRange(start, end);
 }
 
-Json::Value Handler::toJson(SourceLocation const& _location) const
+Json::Value HandlerBase::toJson(SourceLocation const& _location) const
 {
 	solAssert(_location.sourceName);
 	Json::Value item = Json::objectValue;
@@ -41,7 +41,7 @@ Json::Value Handler::toJson(SourceLocation const& _location) const
 	return item;
 }
 
-optional<SourceLocation> Handler::parsePosition(string const& _sourceUnitName, Json::Value const& _position) const
+optional<SourceLocation> HandlerBase::parsePosition(string const& _sourceUnitName, Json::Value const& _position) const
 {
 	if (!m_fileRepository.sourceUnits().count(_sourceUnitName))
 		return nullopt;
@@ -55,7 +55,7 @@ optional<SourceLocation> Handler::parsePosition(string const& _sourceUnitName, J
 	return nullopt;
 }
 
-optional<SourceLocation> Handler::parseRange(string const& _sourceUnitName, Json::Value const& _range) const
+optional<SourceLocation> HandlerBase::parseRange(string const& _sourceUnitName, Json::Value const& _range) const
 {
 	if (!_range.isObject())
 		return nullopt;
