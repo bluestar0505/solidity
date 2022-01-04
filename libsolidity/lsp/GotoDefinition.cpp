@@ -1,4 +1,5 @@
 #include <libsolidity/lsp/GotoDefinition.h>
+#include <libsolidity/lsp/Transport.h> // for RequestError
 #include <libsolidity/lsp/Utils.h>
 #include <libsolidity/ast/AST.h>
 #include <libsolidity/ast/ASTUtils.h>
@@ -25,19 +26,21 @@ void GotoDefinition::operator()(MessageID _id, Json::Value const& _args)
 	string const uri = _args["textDocument"]["uri"].asString();
 	string const sourceUnitName = m_fileRepository.clientPathToSourceUnitName(uri);
 	if (!m_fileRepository.sourceUnits().count(sourceUnitName))
-		throw HandlerError(_id, ErrorCode::RequestFailed, "Unknown file: " + uri);
+		BOOST_THROW_EXCEPTION(
+			RequestError(ErrorCode::RequestFailed) <<
+			errinfo_comment("Unknown file: " + uri)
+		);
 
 	auto const lineColumn = parseLineColumn(_args["position"]);
 	if (!lineColumn)
-		throw HandlerError(
-			_id,
-			ErrorCode::RequestFailed,
-			fmt::format(
+		BOOST_THROW_EXCEPTION(
+			RequestError(ErrorCode::RequestFailed) <<
+			errinfo_comment(fmt::format(
 				"Unknown position {line}:{column} in file: {file}",
 				fmt::arg("line", lineColumn.value().line),
 				fmt::arg("column", lineColumn.value().column),
 				fmt::arg("file", sourceUnitName)
-			)
+			))
 		);
 
 	ASTNode const* sourceNode = m_server.requestASTNode(sourceUnitName, lineColumn.value());
