@@ -46,6 +46,9 @@ public:
 		return true;
 	}
 
+	ASTNode const* innermostMatch() const noexcept { return m_innermostMatch; }
+
+private:
 	int const m_offsetInFile;
 	ASTNode const* m_innermostMatch;
 };
@@ -56,7 +59,7 @@ ASTNode const* locateInnermostASTNode(int _sourceOffset, SourceUnit const& _sour
 {
 	ASTNodeLocator locator{_sourceOffset};
 	_sourceUnit.accept(locator);
-	return locator.m_innermostMatch;
+	return locator.innermostMatch();
 }
 
 bool isConstantVariableRecursive(VariableDeclaration const& _varDecl)
