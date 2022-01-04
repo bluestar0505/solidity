@@ -48,24 +48,21 @@ enum class ErrorCode
 };
 
 // Error exception used to bail out on errors in the LSP function-call handlers.
-class HandlerError: public util::Exception
+class RequestError: public util::Exception
 {
 public:
-	HandlerError(MessageID _id, ErrorCode _code, std::string _message):
-		m_id{_id},
+	RequestError(ErrorCode _code, std::string _message):
 		m_code{_code},
 		m_message{std::move(_message)}
 	{
 	}
 
-	MessageID id() const noexcept { return m_id; }
 	ErrorCode code() const noexcept { return m_code; }
 	std::string const& message() const noexcept { return m_message; }
 
 	char const* what() const noexcept override { return m_message.c_str(); }
 
 private:
-	MessageID m_id;
 	ErrorCode m_code;
 	std::string m_message;
 };

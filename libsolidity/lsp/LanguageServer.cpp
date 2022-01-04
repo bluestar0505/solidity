@@ -96,10 +96,10 @@ LanguageServer::LanguageServer(Transport& _transport):
 		{"initialize", bind(&LanguageServer::handleInitialize, this, _1, _2)},
 		{"initialized", [](auto, auto) {}},
 		{"shutdown", [this](auto, auto) { m_state = State::ShutdownRequested; }},
-		{"textDocument/didOpen", bind(&LanguageServer::handleTextDocumentDidOpen, this, _1, _2)},
-		{"textDocument/didChange", bind(&LanguageServer::handleTextDocumentDidChange, this, _1, _2)},
-		{"textDocument/didClose", bind(&LanguageServer::handleTextDocumentDidClose, this, _1, _2)},
-		{"workspace/didChangeConfiguration", bind(&LanguageServer::handleWorkspaceDidChangeConfiguration, this, _1, _2)},
+		{"textDocument/didOpen", bind(&LanguageServer::handleTextDocumentDidOpen, this, _2)},
+		{"textDocument/didChange", bind(&LanguageServer::handleTextDocumentDidChange, this, _2)},
+		{"textDocument/didClose", bind(&LanguageServer::handleTextDocumentDidClose, this, _2)},
+		{"workspace/didChangeConfiguration", bind(&LanguageServer::handleWorkspaceDidChangeConfiguration, this, _2)},
 	},
 	m_fileRepository("/" /* basePath */),
 	m_compilerStack{m_fileRepository.reader()}
@@ -260,6 +260,10 @@ bool LanguageServer::run()
 			else
 				m_client.error({}, ErrorCode::ParseError, "\"method\" has to be a string.");
 		}
+		catch (RequestError const& error)
+		{
+			m_client.error(id, error.code(), error.message() + " " + boost::current_exception_diagnostic_information());
+		}
 		catch (...)
 		{
 			m_client.error(id, ErrorCode::InternalError, "Unhandled exception: "s + boost::current_exception_diagnostic_information());
@@ -268,16 +272,16 @@ bool LanguageServer::run()
 	return m_state == State::ExitRequested;
 }
 
-void LanguageServer::requireServerInitialized(MessageID _id)
+void LanguageServer::requireServerInitialized()
 {
 	if (m_state != State::Initialized)
-		throw HandlerError(_id, ErrorCode::ServerNotInitialized, "Server is not properly initialized.");
+		BOOST_THROW_EXCEPTION(RequestError(ErrorCode::ServerNotInitialized, "Server is not properly initialized."));
 }
 
 void LanguageServer::handleInitialize(MessageID _id, Json::Value const& _args)
 {
 	if (m_state != State::Started)
-		throw HandlerError(_id, ErrorCode::RequestFailed, "Initialize called at the wrong time.");
+		BOOST_THROW_EXCEPTION(RequestError(ErrorCode::RequestFailed, "Initialize called at the wrong time."));
 
 	m_state = State::Initialized;
 
@@ -288,7 +292,7 @@ void LanguageServer::handleInitialize(MessageID _id, Json::Value const& _args)
 	{
 		rootPath = uri.asString();
 		if (!boost::starts_with(rootPath, "file://"))
-			throw HandlerError(_id, ErrorCode::InvalidParams, "rootUri only supports file URI scheme.");
+			BOOST_THROW_EXCEPTION(RequestError(ErrorCode::InvalidParams, "rootUri only supports file URI scheme."));
 
 		rootPath = rootPath.substr(7);
 	}
@@ -308,21 +312,20 @@ void LanguageServer::handleInitialize(MessageID _id, Json::Value const& _args)
 	m_client.reply(_id, move(replyArgs));
 }
 
-
-void LanguageServer::handleWorkspaceDidChangeConfiguration(MessageID _id, Json::Value const& _args)
+void LanguageServer::handleWorkspaceDidChangeConfiguration(Json::Value const& _args)
 {
-	requireServerInitialized(_id);
+	requireServerInitialized();
 
 	if (_args["settings"].isObject())
 		changeConfiguration(_args["settings"]);
 }
 
-void LanguageServer::handleTextDocumentDidOpen(MessageID _id, Json::Value const& _args)
+void LanguageServer::handleTextDocumentDidOpen(Json::Value const& _args)
 {
-	requireServerInitialized(_id);
+	requireServerInitialized();
 
 	if (!_args["textDocument"])
-		throw HandlerError(_id, ErrorCode::RequestFailed, "Text document parameter missing.");
+		BOOST_THROW_EXCEPTION(RequestError(ErrorCode::RequestFailed, "Text document parameter missing."));
 
 	string text = _args["textDocument"]["text"].asString();
 	string uri = _args["textDocument"]["uri"].asString();
@@ -331,31 +334,30 @@ void LanguageServer::handleTextDocumentDidOpen(MessageID _id, Json::Value const&
 	compileAndUpdateDiagnostics();
 }
 
-void LanguageServer::handleTextDocumentDidChange(MessageID _id, Json::Value const& _args)
+void LanguageServer::handleTextDocumentDidChange(Json::Value const& _args)
 {
-	requireServerInitialized(_id);
+	requireServerInitialized();
 
 	string const uri = _args["textDocument"]["uri"].asString();
 
 	for (Json::Value jsonContentChange: _args["contentChanges"])
 	{
 		if (!jsonContentChange.isObject())
-			throw HandlerError(_id, ErrorCode::RequestFailed, "Invalid content reference.");
+			BOOST_THROW_EXCEPTION(RequestError(ErrorCode::RequestFailed, "Invalid content reference."));
 
 		string const sourceUnitName = m_fileRepository.clientPathToSourceUnitName(uri);
 		if (!m_fileRepository.sourceUnits().count(sourceUnitName))
-			throw HandlerError(_id, ErrorCode::RequestFailed, "Unknown file: " + uri);
+			BOOST_THROW_EXCEPTION(RequestError(ErrorCode::RequestFailed, "Unknown file: " + uri));
 
 		string text = jsonContentChange["text"].asString();
 		if (jsonContentChange["range"].isObject()) // otherwise full content update
 		{
 			optional<SourceLocation> change = parseRange(sourceUnitName, jsonContentChange["range"]);
 			if (!change || !change->hasText())
-				throw HandlerError(
-					_id,
+				BOOST_THROW_EXCEPTION(RequestError(
 					ErrorCode::RequestFailed,
 					"Invalid source range: " + jsonCompactPrint(jsonContentChange["range"])
-				);
+				));
 
 			string buffer = m_fileRepository.sourceUnits().at(sourceUnitName);
 			buffer.replace(static_cast<size_t>(change->start), static_cast<size_t>(change->end - change->start), move(text));
@@ -367,12 +369,12 @@ void LanguageServer::handleTextDocumentDidChange(MessageID _id, Json::Value cons
 	compileAndUpdateDiagnostics();
 }
 
-void LanguageServer::handleTextDocumentDidClose(MessageID _id, Json::Value const& _args)
+void LanguageServer::handleTextDocumentDidClose(Json::Value const& _args)
 {
-	requireServerInitialized(_id);
+	requireServerInitialized();
 
 	if (!_args["textDocument"])
-		throw HandlerError(_id, ErrorCode::RequestFailed, "Text document parameter missing.");
+		BOOST_THROW_EXCEPTION(RequestError(ErrorCode::RequestFailed, "Text document parameter missing."));
 
 	string uri = _args["textDocument"]["uri"].asString();
 	m_openFiles.erase(uri);
