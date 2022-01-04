@@ -24,8 +24,8 @@ namespace solidity::lsp
 void GotoDefinition::operator()(MessageID _id, Json::Value const& _args)
 {
 	string const uri = _args["textDocument"]["uri"].asString();
-	string const sourceUnitName = m_fileRepository.clientPathToSourceUnitName(uri);
-	if (!m_fileRepository.sourceUnits().count(sourceUnitName))
+	string const sourceUnitName = fileRepository().clientPathToSourceUnitName(uri);
+	if (!fileRepository().sourceUnits().count(sourceUnitName))
 		BOOST_THROW_EXCEPTION(
 			RequestError(ErrorCode::RequestFailed) <<
 			errinfo_comment("Unknown file: " + uri)
@@ -61,7 +61,7 @@ void GotoDefinition::operator()(MessageID _id, Json::Value const& _args)
 	else if (auto const* importDirective = dynamic_cast<ImportDirective const*>(sourceNode))
 	{
 		auto const& path = *importDirective->annotation().absolutePath;
-		if (m_fileRepository.sourceUnits().count(path))
+		if (fileRepository().sourceUnits().count(path))
 			locations.emplace_back(SourceLocation{0, 0, make_shared<string const>(path)});
 	}
 	else if (auto const* declaration = dynamic_cast<Declaration const*>(sourceNode))
@@ -73,7 +73,7 @@ void GotoDefinition::operator()(MessageID _id, Json::Value const& _args)
 	Json::Value reply = Json::arrayValue;
 	for (SourceLocation const& location: locations)
 		reply.append(toJson(location));
-	m_client.reply(_id, reply);
+	client().reply(_id, reply);
 }
 
 }
