@@ -31,7 +31,7 @@ namespace
 class ASTNodeLocator: public ASTConstVisitor
 {
 public:
-	explicit ASTNodeLocator(int _pos): m_offsetInFile{_pos}, m_innermostMatch{nullptr} {}
+	explicit ASTNodeLocator(int _sourceOffset): m_offsetInFile{_sourceOffset}, m_innermostMatch{nullptr} {}
 
 	bool visitNode(ASTNode const& _node) override
 	{
@@ -52,9 +52,9 @@ public:
 
 }
 
-ASTNode const* locateInnermostASTNode(int _pos, SourceUnit const& _sourceUnit)
+ASTNode const* locateInnermostASTNode(int _sourceOffset, SourceUnit const& _sourceUnit)
 {
-	ASTNodeLocator locator{_pos};
+	ASTNodeLocator locator{_sourceOffset};
 	_sourceUnit.accept(locator);
 	return locator.m_innermostMatch;
 }
